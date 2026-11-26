@@ -32,7 +32,8 @@ function buildInitialQueue(state: InitialConversationState) {
 }
 
 export function buildInitialConversation(
-  state: InitialConversationState
+  state: InitialConversationState,
+  title?: string
 ): NonNullable<TaskConfig['initialConversation']> | undefined {
   const { provider } = state;
   if (!provider) return undefined;
@@ -41,7 +42,7 @@ export function buildInitialConversation(
   return {
     id: crypto.randomUUID(),
     provider,
-    title: nextDefaultConversationTitle(provider, []),
+    title: title ?? nextDefaultConversationTitle(provider, []),
     ...(type === 'acp'
       ? { initialQueue: buildInitialQueue(state) }
       : state.initialPromptSupported

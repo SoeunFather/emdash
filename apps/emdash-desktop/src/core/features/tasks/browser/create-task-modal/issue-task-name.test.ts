@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getIssueTaskName } from './issue-task-name';
+import { getIssueTaskName, getAsanaSessionName } from './issue-task-name';
 
 describe('getIssueTaskName', () => {
   it('normalizes a Linear branch name into a lowercase task name by default', () => {
@@ -86,5 +86,21 @@ describe('getIssueTaskName', () => {
           'jona/gen-626-a-very-long-linear-issue-branch-name-that-should-be-truncated-for-task-name-display',
       })
     ).toHaveLength(64);
+  });
+});
+
+describe('getAsanaSessionName', () => {
+  const issue = {
+    provider: 'asana' as const, identifier: '42', url: '', title: 'Example',
+    customFields: [{ name: 'Ticket ID', value: '  IOS-42 영상 편집  ' }, {name: 'Empty', value: ' '}],
+  };
+  it('uses the display value of the exact column, preserving case and spaces', () => {
+    expect(getAsanaSessionName(issue, ' Ticket ID ')).toBe('IOS-42 영상 편집');
+  });
+  it('falls back for missing, empty, or differently cased columns and other providers', () => {
+    for (const column of ['', 'ticket id', 'Empty', 'Missing']) {
+      expect(getAsanaSessionName(issue, column)).toBeUndefined();
+    }
+    expect(getAsanaSessionName({...issue, provider: 'jira'}, 'Ticket ID')).toBeUndefined();
   });
 });

@@ -30,6 +30,7 @@ const v0Schema = z.object({
   displayIdentifier: z.string().nullable().optional(),
   description: z.string().optional(),
   context: z.string().optional(),
+  customFields: z.array(z.object({ name: z.string(), value: z.string() })).optional(),
   branchName: z.string().optional(),
   status: z.string().optional(),
   assignees: z.array(z.string()).optional(),

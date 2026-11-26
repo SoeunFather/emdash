@@ -147,6 +147,7 @@ export const CreateTaskModal = observer(function CreateTaskModal({
             hasAnyIssueIntegration={hasAnyIssueIntegration}
             hasPrSupport={hasPrSupport}
             requestProvider={repositoryProvider}
+            issueProvider={issueProvider}
             issueLabel={issueTerms(issueProvider ?? repositoryProvider).title}
             projectId={selectedProjectId}
             repositoryUrl={repositoryUrl}

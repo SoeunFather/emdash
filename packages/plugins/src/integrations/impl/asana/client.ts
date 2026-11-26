@@ -59,9 +59,7 @@ export async function verifyAsanaCredentials(
       ...(user.gid ? { account: { id: user.gid } } : {}),
       displayName,
       displayDetail,
-      credentials: {
-        accessToken: credentials.data.accessToken,
-      },
+      credentials: credentials.data,
     });
   } catch (error) {
     return err(toIntegrationError(error, 'Asana'));

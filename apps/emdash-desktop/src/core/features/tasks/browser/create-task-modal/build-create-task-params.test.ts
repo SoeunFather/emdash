@@ -39,6 +39,11 @@ function makeInitialConversationState(
 }
 
 describe('buildInitialConversation', () => {
+  it('keeps the chosen session name for chat and terminal conversations', () => {
+    for (const chat of [true, false]) {
+      expect(buildInitialConversation(makeInitialConversationState(agent('claude'), chat), 'IOS-42 영상 편집')?.title).toBe('IOS-42 영상 편집');
+    }
+  });
   it('uses the draft auto-approve value for supported providers', () => {
     expect(buildInitialConversation(makeInitialConversationState(agent('claude'), true))).toEqual(
       expect.objectContaining({ provider: 'claude', autoApprove: true })

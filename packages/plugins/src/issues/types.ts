@@ -10,6 +10,7 @@ export type IssueData = {
   title: string;
   url?: string;
   description?: string;
+  customFields?: Array<{ name: string; value: string }>;
   branchName?: string;
   status?: string;
   assignees?: string[];

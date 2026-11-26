@@ -18,8 +18,9 @@ export function useTaskName(opts?: {
   isPending?: boolean;
   resetKey?: unknown;
   initialName?: string;
+  preserveDisplayName?: boolean;
 }): TaskNameState {
-  const { generatedName, isPending = false, resetKey } = opts ?? {};
+  const { generatedName, isPending = false, preserveDisplayName = false, resetKey } = opts ?? {};
   const [taskName, setTaskName] = useState('');
   const [showSlugHint, setShowSlugHint] = useState(false);
   const [prevResetKey, setPrevResetKey] = useState(resetKey);
@@ -32,17 +33,18 @@ export function useTaskName(opts?: {
   }
 
   const handleTaskNameChange = useCallback((value: string) => {
-    const transformed = liveTransformTaskName(value);
+    const transformed = preserveDisplayName ? value : liveTransformTaskName(value);
     setTaskName(transformed);
     const hasDroppedChars = /[^a-z0-9\s-]/i.test(value);
-    setShowSlugHint(hasDroppedChars);
-  }, []);
+    setShowSlugHint(!preserveDisplayName && hasDroppedChars);
+  }, [preserveDisplayName]);
 
   const placeholder = generatedName ?? '';
-  const effectiveTaskName = taskName.trim() || generatedName || '';
+  const typedName = preserveDisplayName ? taskName : liveTransformTaskName(taskName);
+  const effectiveTaskName = typedName.trim() || generatedName || '';
 
   return {
-    taskName,
+    taskName: typedName,
     placeholder,
     effectiveTaskName,
     handleTaskNameChange,

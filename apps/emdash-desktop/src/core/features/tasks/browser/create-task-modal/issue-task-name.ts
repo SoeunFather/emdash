@@ -17,3 +17,8 @@ export function getIssueTaskName(
   const normalized = normalizeTaskName(branchName.replace(/\//g, '-'), options);
   return normalized || null;
 }
+
+export function getAsanaSessionName(issue: LinkedIssue | null, column: string) {
+  if (issue?.provider !== 'asana' || !column.trim()) return undefined;
+  return issue.customFields?.find((field) => field.name === column.trim())?.value.trim() || undefined;
+}

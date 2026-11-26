@@ -1,4 +1,4 @@
-import { Button, ToggleGroup } from '@emdash/ui/react/primitives';
+import { Button, Input, ToggleGroup } from '@emdash/ui/react/primitives';
 import { IssueComboboxField } from './issue-combobox-field';
 import { PrComboboxField } from './pr-combobox-field';
 import type { LinkedType, CreateTaskState } from './use-create-task-state';
@@ -8,6 +8,7 @@ interface LinkedEntitySectionProps {
   hasAnyIssueIntegration: boolean;
   hasPrSupport: boolean;
   requestProvider?: string;
+  issueProvider?: string | null;
   issueLabel: string;
   projectId?: string;
   repositoryUrl?: string;
@@ -19,6 +20,7 @@ export function LinkedEntitySection({
   hasAnyIssueIntegration,
   hasPrSupport,
   requestProvider,
+  issueProvider,
   issueLabel,
   projectId,
   repositoryUrl,
@@ -54,6 +56,19 @@ export function LinkedEntitySection({
             repositoryUrl={repositoryUrl}
             projectPath={projectPath}
           />
+          {(state.linkedIssue?.provider ?? issueProvider) === 'asana' && (
+            <label className="flex flex-col gap-1 border-t px-3 py-2 text-xs">
+              Asana column for session name
+              <Input
+                value={state.asanaColumn}
+                placeholder="Optional · e.g. Ticket ID"
+                onChange={(event) => state.setAsanaColumn(event.target.value)}
+              />
+              {state.linkedIssue && state.asanaColumn.trim() && !state.asanaName && (
+                <span className="text-foreground-muted">No matching value. Using the usual task name.</span>
+              )}
+            </label>
+          )}
           {state.issueContextPending && (
             <p role="status" className="px-3 pb-2 text-xs text-foreground-muted">
               Loading ticket context…
