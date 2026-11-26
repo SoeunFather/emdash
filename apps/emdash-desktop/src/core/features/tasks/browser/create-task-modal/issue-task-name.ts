@@ -20,5 +20,11 @@ export function getIssueTaskName(
 
 export function getAsanaSessionName(issue: LinkedIssue | null, column: string) {
   if (issue?.provider !== 'asana' || !column.trim()) return undefined;
-  return issue.customFields?.find((field) => field.name === column.trim())?.value.trim() || undefined;
+  return (
+    issue.customFields?.find((field) => field.name === column.trim())?.value.trim() || undefined
+  );
+}
+
+export function getAsanaWorktreeName(issue: LinkedIssue, displayName: string): string {
+  return getIssueTaskName(issue) ?? (normalizeTaskName(displayName) || `asana-${issue.identifier}`);
 }

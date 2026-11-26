@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getIssueTaskName, getAsanaSessionName } from './issue-task-name';
+import { getIssueTaskName, getAsanaSessionName, getAsanaWorktreeName } from './issue-task-name';
 
 describe('getIssueTaskName', () => {
   it('normalizes a Linear branch name into a lowercase task name by default', () => {
@@ -91,16 +91,26 @@ describe('getIssueTaskName', () => {
 
 describe('getAsanaSessionName', () => {
   const issue = {
-    provider: 'asana' as const, identifier: '42', url: '', title: 'Example',
-    customFields: [{ name: 'Ticket ID', value: '  IOS-42 영상 편집  ' }, {name: 'Empty', value: ' '}],
+    provider: 'asana' as const,
+    identifier: '42',
+    url: '',
+    title: 'Example',
+    customFields: [
+      { name: 'Ticket ID', value: '  IOS-42 영상 편집  ' },
+      { name: 'Empty', value: ' ' },
+    ],
   };
   it('uses the display value of the exact column, preserving case and spaces', () => {
     expect(getAsanaSessionName(issue, ' Ticket ID ')).toBe('IOS-42 영상 편집');
+  });
+  it('keeps the configured worktree field independent of the display name', () => {
+    expect(getAsanaWorktreeName({ ...issue, branchName: 'DEV-42' }, '영상 편집')).toBe('dev-42');
+    expect(getAsanaWorktreeName(issue, '영상 편집')).toBe('asana-42');
   });
   it('falls back for missing, empty, or differently cased columns and other providers', () => {
     for (const column of ['', 'ticket id', 'Empty', 'Missing']) {
       expect(getAsanaSessionName(issue, column)).toBeUndefined();
     }
-    expect(getAsanaSessionName({...issue, provider: 'jira'}, 'Ticket ID')).toBeUndefined();
+    expect(getAsanaSessionName({ ...issue, provider: 'jira' }, 'Ticket ID')).toBeUndefined();
   });
 });

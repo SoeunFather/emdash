@@ -1,9 +1,4 @@
 import crypto from 'node:crypto';
-import type { HostRef } from '@emdash/core/primitives/host/api';
-import type { CreateConversationInput } from '@emdash/core/runtimes/conversations/api';
-import { compileWorktreePayload } from '@emdash/core/runtimes/workspace-registry/api';
-import { err, ok, type Result } from '@emdash/shared';
-import { and, eq, isNull, sql } from 'drizzle-orm';
 import { conversationWireEvents } from '@core/features/conversations/api/node';
 import {
   buildHostConversationCreateInput,
@@ -41,6 +36,7 @@ import {
 } from '@core/features/workspaces/api/node/registry/workspace-tombstones';
 import type { ConversationConfig } from '@core/primitives/conversations/api';
 import type { Conversation } from '@core/primitives/conversations/api';
+import { toStoredLinkedIssue } from '@core/primitives/linked-issues/api';
 import type {
   CreateTaskError,
   CreateTaskParams,
@@ -57,6 +53,11 @@ import type {
   TaskRow,
   WorkspaceInsert,
 } from '@core/services/app-db/node/schema';
+import type { HostRef } from '@emdash/core/primitives/host/api';
+import type { CreateConversationInput } from '@emdash/core/runtimes/conversations/api';
+import { compileWorktreePayload } from '@emdash/core/runtimes/workspace-registry/api';
+import { err, ok, type Result } from '@emdash/shared';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 
 type ConvInsert = ConversationInsert;
 
@@ -354,7 +355,7 @@ export function commitCreateTask(
       name: params.taskConfig.name,
       status: initialStatus,
       workspaceId,
-      linkedIssue: params.taskConfig.linkedIssue ?? null,
+      linkedIssue: toStoredLinkedIssue(params.taskConfig.linkedIssue),
       type: 'task',
       updatedAt: sql`CURRENT_TIMESTAMP`,
       statusChangedAt: sql`CURRENT_TIMESTAMP`,

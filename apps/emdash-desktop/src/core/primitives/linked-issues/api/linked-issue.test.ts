@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   linkedIssue,
+  toStoredLinkedIssue,
   linkedIssueDisplayIdentifier,
   linkedIssueMentionName,
   linkedIssueResourcesMatch,
@@ -109,4 +110,12 @@ describe('linked issue display helpers', () => {
       })
     ).toBe('Linked issue');
   });
+});
+
+it('omits picker-only column values when persisting a link', () => {
+  const issue = { provider: 'asana' as const, title: 'Task', identifier: '42', url: '' };
+  expect(
+    toStoredLinkedIssue({ ...issue, customFields: [{ name: 'Budget', value: '123' }] })
+  ).toEqual(issue);
+  expect(toStoredLinkedIssue(undefined)).toBeNull();
 });

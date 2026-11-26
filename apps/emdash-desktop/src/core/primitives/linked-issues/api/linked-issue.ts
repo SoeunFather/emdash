@@ -117,3 +117,10 @@ export function linkedIssueMentionName(
 ): string {
   return linkedIssueDisplayIdentifier(issue) ?? (issue.title || 'Linked issue');
 }
+
+/** Custom field values are only used by the issue picker. */
+export function toStoredLinkedIssue(issue: LinkedIssue | null | undefined) {
+  if (!issue) return null;
+  const { customFields: _customFields, ...stored } = issue;
+  return stored;
+}
