@@ -965,6 +965,18 @@ export const AcpChatPanel = observer(function AcpChatPanel() {
           heroSlot
         )}
 
+      {showComposer && composerSlot && store.affordances.isBusy && createPortal(
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={!store.liveActionsEnabled}
+          onClick={() => store.retry()}
+        >
+          Refresh session status
+        </Button>,
+        composerSlot
+      )}
+
       {showComposer && composerSlot && (
         <ComposerForStore
           key={store.conversationId}

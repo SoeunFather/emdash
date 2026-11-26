@@ -6,6 +6,7 @@ import { createLiveJobReplicaCache, LiveJobFailedError } from '@emdash/wire/live
 import { optimistic, remote, type OptimisticView, type RemoteModel } from '@emdash/wire/state';
 import { makeObservable, observable, runInAction, toJS } from 'mobx';
 import { match } from 'ts-pattern';
+import { getConversationsClient } from '@core/features/conversations/api/browser/client';
 import { PROJECT_LIVE_ACCESS_REQUIRED_MESSAGE } from '@core/features/projects/api/attachments';
 import type { ProjectHostAccess } from '@core/features/projects/api/browser/stores/project-context';
 import { getProjectManagerStore } from '@core/features/projects/api/browser/stores/project-selectors';
@@ -457,7 +458,30 @@ export class TaskManagerStore {
       toast.error(formatCreateTaskWarning(result.data.warning));
     }
 
-    await this.provisionTask(params.id);
+    const provision = await this.provisionTask(params.id);
+    const conversation = params.taskConfig.initialConversation;
+    if (provision.kind !== 'active' || !conversation) return;
+    try {
+      const client = await getConversationsClient();
+      if (conversation.type === 'acp' && conversation.initialQueue?.length) {
+        // The host coalesces starts and consumes the initial queue once.
+        const result = await client.acp.startSession(
+          { conversationId: conversation.id, mode: 'resume' },
+          { timeoutMs: 0 }
+        );
+        if (!result.success) throw new Error(result.error.type);
+      } else if (conversation.type === 'pty' && conversation.initialPrompt?.trim()) {
+        const result = await client.hydrateConversation({
+          conversationId: conversation.id,
+          taskId: params.id,
+          projectId: params.projectId,
+        });
+        if (!result.success) throw new Error(result.error.type);
+      }
+    } catch (error) {
+      log.warn('Initial conversation could not start', { conversationId: conversation.id, error });
+      toast.error('Could not start the agent. Open the conversation to retry.');
+    }
   }
 
   async provisionTask(taskId: string): Promise<TaskProvisionOutcome> {
