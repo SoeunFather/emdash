@@ -12,12 +12,13 @@ export function toAsanaTask(task: RawAsanaTask): AsanaTask | null {
     completed: task.completed,
     modifiedAt: task.modified_at,
     assignee: task.assignee,
+    customFields: task.custom_fields,
     projects: task.projects,
     memberships: task.memberships,
   };
 }
 
-export function toIssueData(task: AsanaTask): IssueData {
+export function toIssueData(task: AsanaTask, worktreeField?: string): IssueData {
   const projectName =
     task.projects?.find((project) => !!project.name)?.name ??
     task.memberships?.find((membership) => !!membership.project?.name)?.project?.name;
@@ -25,6 +26,12 @@ export function toIssueData(task: AsanaTask): IssueData {
     ?.name;
 
   return {
+    ...(worktreeField && {
+      branchName: task.customFields?.find((field) => field.gid === worktreeField || field.name === worktreeField)?.display_value?.trim() || undefined,
+    }),
+    customFields: task.customFields?.flatMap(({ name, display_value }) =>
+      name && display_value?.trim() ? [{ name, value: display_value.trim() }] : []
+    ),
     identifier: task.gid,
     displayIdentifier: null,
     title: task.name ?? '',

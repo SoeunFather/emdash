@@ -34,14 +34,14 @@ export async function listIssues(
       workspace: workspace.data.gid,
       completed_since: 'now',
       limit: clampIssueLimit(opts.limit, 50, 100),
-      opt_fields: TASK_OPT_FIELDS,
+      opt_fields: TASK_OPT_FIELDS + ',custom_fields.gid,custom_fields.name,custom_fields.display_value',
     })) as AsanaResponse<RawAsanaTask[]>;
 
     return ok(
       (response.data ?? [])
         .map(toAsanaTask)
         .filter((task): task is AsanaTask => task !== null)
-        .map(toIssueData)
+        .map((task) => toIssueData(task, parsedCredentials.data.worktreeField))
     );
   } catch (error) {
     host.log.warn('Asana listIssues failed', { error });
@@ -69,7 +69,7 @@ export async function searchIssues(
       resource_subtype: 'default_task',
       completed: false,
       limit: clampIssueLimit(opts.limit, 20, 100),
-      opt_fields: TASK_OPT_FIELDS,
+      opt_fields: TASK_OPT_FIELDS + ',custom_fields.gid,custom_fields.name,custom_fields.display_value',
     };
 
     const response = (await client.tasks.searchTasksForWorkspace(
@@ -81,7 +81,7 @@ export async function searchIssues(
       (response.data ?? [])
         .map(toAsanaTask)
         .filter((task): task is AsanaTask => task !== null)
-        .map(toIssueData)
+        .map((task) => toIssueData(task, parsedCredentials.data.worktreeField))
     );
   } catch (error) {
     host.log.warn('Asana searchIssues failed', { error });

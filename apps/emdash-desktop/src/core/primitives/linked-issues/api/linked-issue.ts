@@ -30,6 +30,7 @@ const v0Schema = z.object({
   displayIdentifier: z.string().nullable().optional(),
   description: z.string().optional(),
   context: z.string().optional(),
+  customFields: z.array(z.object({ name: z.string(), value: z.string() })).optional(),
   branchName: z.string().optional(),
   status: z.string().optional(),
   assignees: z.array(z.string()).optional(),
@@ -115,4 +116,11 @@ export function linkedIssueMentionName(
   issue: Pick<LinkedIssue, 'identifier' | 'displayIdentifier' | 'title'>
 ): string {
   return linkedIssueDisplayIdentifier(issue) ?? (issue.title || 'Linked issue');
+}
+
+/** Custom field values are only used by the issue picker. */
+export function toStoredLinkedIssue(issue: LinkedIssue | null | undefined) {
+  if (!issue) return null;
+  const { customFields: _customFields, ...stored } = issue;
+  return stored;
 }

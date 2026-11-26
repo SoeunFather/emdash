@@ -24,6 +24,10 @@ export function resolveTaskBranchName({
     return linearBranchName;
   }
 
+  if (linkedIssue?.provider === 'asana' && linkedIssue.branchName?.trim() && rawBranch) {
+    return branchPrefix ? `${branchPrefix}/${rawBranch}` : rawBranch;
+  }
+
   const shouldAppendSuffix =
     appendRandomSuffix && !disableRandomSuffix && linkedIssue?.provider !== 'linear';
   const branch = shouldAppendSuffix ? `${rawBranch}-${suffix}` : rawBranch;

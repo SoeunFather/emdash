@@ -89,6 +89,7 @@ export function toLinkedIssue(
     url: issue.url ?? '',
     description: issue.description,
     context: issue.context,
+    customFields: issue.customFields,
     branchName: issue.branchName,
     status: issue.status,
     assignees: issue.assignees,

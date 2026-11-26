@@ -48,7 +48,7 @@ export function useCreateTaskCallback({
           name: state.taskName.effectiveTaskName,
           linkedIssue: state.linkedType === 'issue' ? (state.linkedIssue ?? undefined) : undefined,
           initialStatus: deriveInitialStatus(state.linkedType, state.linkedPR),
-          initialConversation: buildInitialConversation(initialConversation),
+          initialConversation: buildInitialConversation(initialConversation, state.asanaName ? state.taskName.effectiveTaskName : undefined),
         },
         workspaceConfig: state.workspaceConfig.resolvedConfig,
       })

@@ -1,14 +1,15 @@
-import type { GitBranchRef } from '@emdash/core/runtimes/git/api';
-import type { PullRequest } from '@emdash/plugins/pull-requests/schemas';
-import { useQuery } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
 import { getTasksWireClient } from '@core/features/tasks/api/browser/client';
 import { useTaskName } from '@core/features/tasks/api/browser/create-task-modal/use-task-name';
 import { useWorkspaceConfig } from '@core/features/tasks/api/browser/create-task-modal/use-workspace-config';
 import { useTaskSettings } from '@core/features/tasks/api/browser/hooks/useTaskSettings';
 import type { LinkedIssue } from '@core/primitives/linked-issues/api';
+import { useLocalStorage } from '@core/primitives/react-hooks/browser/useLocalStorage';
+import type { GitBranchRef } from '@emdash/core/runtimes/git/api';
+import type { PullRequest } from '@emdash/plugins/pull-requests/schemas';
+import { useQuery } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
 import { useLinkedIssueContext } from '../issue-context/use-linked-issue-context';
-import { getIssueTaskName } from './issue-task-name';
+import { getAsanaSessionName, getAsanaWorktreeName, getIssueTaskName } from './issue-task-name';
 
 export type LinkedType = 'issue' | 'pr' | null;
 
@@ -41,8 +42,23 @@ export function useCreateTaskState(
     setLinkedPRRaw(null);
   }
 
+  const [asanaColumns, setAsanaColumns] = useLocalStorage<Record<string, string>>(
+    'createTask.asanaNameColumns',
+    {}
+  );
+  const asanaColumn = (projectId && asanaColumns[projectId]) || '';
+  const setAsanaColumn = (value: string) => {
+    if (projectId) setAsanaColumns((prev) => ({ ...prev, [projectId]: value }));
+  };
+  const asanaName =
+    linkedType === 'issue' ? getAsanaSessionName(selectedIssue, asanaColumn) : undefined;
+  const issueForContext = useMemo(() => {
+    if (!selectedIssue?.customFields) return selectedIssue;
+    const { customFields: _fields, ...issue } = selectedIssue;
+    return issue;
+  }, [selectedIssue]);
   const issueContext = useLinkedIssueContext(
-    selectedIssue,
+    issueForContext,
     projectId,
     linkedType === 'issue' && includeIssueContextByDefault
   );
@@ -62,7 +78,7 @@ export function useCreateTaskState(
   });
 
   // Issue-derived name (Linear can derive directly from branchName; others need AI)
-  const directIssueTaskName = getIssueTaskName(linkedIssue);
+  const directIssueTaskName = asanaName ?? getIssueTaskName(linkedIssue);
   const shouldGenerateFromIssue =
     autoGenerateName &&
     linkedType === 'issue' &&
@@ -112,6 +128,7 @@ export function useCreateTaskState(
   })();
 
   const taskName = useTaskName({
+    preserveDisplayName: !!asanaName,
     generatedName,
     isPending,
     resetKey: projectId,
@@ -125,7 +142,12 @@ export function useCreateTaskState(
     currentBranch,
     repositoryWorkspaceId,
     pr: linkedType === 'pr' ? linkedPR : null,
-    taskName: taskName.effectiveTaskName,
+    taskName:
+      linkedType === 'issue' &&
+      linkedIssue?.provider === 'asana' &&
+      (asanaName || linkedIssue.branchName)
+        ? getAsanaWorktreeName(linkedIssue, taskName.effectiveTaskName)
+        : taskName.effectiveTaskName,
     linkedIssue: linkedType === 'issue' ? linkedIssue : null,
     createBranchAndWorktreeDefault: createBranchAndWorktree,
     resetKey: projectId,
@@ -162,6 +184,9 @@ export function useCreateTaskState(
   return {
     linkedType,
     setLinkedType,
+    asanaColumn,
+    setAsanaColumn,
+    asanaName,
     linkedIssue,
     setLinkedIssue,
     issueContextPending: issueContext.isLoading,

@@ -1,11 +1,11 @@
-import { and, eq, isNull } from 'drizzle-orm';
 import { mapTaskRowToTask } from '@core/features/tasks/api/node/utils/utils';
-import type { LinkedIssue } from '@core/primitives/linked-issues/api';
+import { toStoredLinkedIssue, type LinkedIssue } from '@core/primitives/linked-issues/api';
 import type { Task } from '@core/primitives/tasks/api';
 import type { TelemetryService } from '@core/primitives/telemetry/api/telemetry';
 import type { AppDb } from '@core/services/app-db/node/db';
 import { appDbPokes } from '@core/services/app-db/node/pokes';
 import { tasks } from '@core/services/app-db/node/schema';
+import { and, eq, isNull } from 'drizzle-orm';
 
 export async function updateLinkedIssue(
   db: AppDb,
@@ -23,7 +23,7 @@ export async function updateLinkedIssue(
   const [updatedRow] = await db
     .update(tasks)
     .set({
-      linkedIssue: issue ?? null,
+      linkedIssue: toStoredLinkedIssue(issue),
     })
     .where(and(eq(tasks.id, taskId), isNull(tasks.deletedAt)))
     .returning();
