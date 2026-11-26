@@ -39,7 +39,8 @@ describe('ACP attachment recovery over replaceable Wire', () => {
         await session.startSession();
         expect(runtime.startSession.mock.calls[0]?.[0]).toEqual({
           conversationId: 'conversation',
-          mode: sessionId ? 'resume' : 'fresh',
+          // Default starts join a concurrent background launch, including the first launch.
+          mode: 'resume',
         });
         await session.startSession('fresh');
         expect(runtime.startSession.mock.calls[1]?.[0]).toEqual({

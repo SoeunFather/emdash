@@ -1,4 +1,9 @@
 import {
+  getConversationsClient,
+  type ConversationsClient,
+} from '@core/features/conversations/api/browser/client';
+import type { ProjectAttachmentError } from '@core/features/projects/api/attachments';
+import {
   initialSessionConfigState,
   planStateSchema,
   sessionUsageSchema,
@@ -22,11 +27,6 @@ import { WireError, type LiveClientHandle } from '@emdash/wire/rpc';
 import { observe, whenReady, type Readable } from '@emdash/wire/state';
 import { observable, runInAction } from 'mobx';
 import { z } from 'zod';
-import {
-  getConversationsClient,
-  type ConversationsClient,
-} from '@core/features/conversations/api/browser/client';
-import type { ProjectAttachmentError } from '@core/features/projects/api/attachments';
 
 export interface LiveValueSource<T> {
   getSnapshot(): T;
@@ -204,12 +204,13 @@ export class AcpLiveSession {
     }
   }
 
-  async startSession(mode: AcpSessionStartMode = 'resume') {
-    const result = await this.client.startSession(
+  // Resume also creates an absent session and joins an in-flight launch. Fresh
+  // is an explicit recovery request that may reject an already active session.
+  startSession(mode: AcpSessionStartMode = 'resume') {
+    return this.client.startSession(
       { conversationId: this.conversationId, mode },
       { timeoutMs: 0 }
     );
-    return result;
   }
 
   loadHistory(before?: number, limit = 50) {

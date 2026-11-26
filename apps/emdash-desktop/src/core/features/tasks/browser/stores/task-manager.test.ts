@@ -1,10 +1,3 @@
-import { ok } from '@emdash/shared';
-import { LiveJobFailedError } from '@emdash/wire/live';
-import { cell } from '@emdash/wire/state';
-import { expose } from '@emdash/wire/state';
-import { createTestWire } from '@emdash/wire/testing';
-import { runInAction } from 'mobx';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   ProjectHostAccess,
   ProjectHostAccessState,
@@ -18,8 +11,17 @@ import {
 } from '@core/features/tasks/api/browser/stores/task-manager';
 import { createUnprovisionedTask } from '@core/features/tasks/api/browser/stores/task-store';
 import type { Task, TaskListData, TaskStatsData } from '@core/primitives/tasks/api';
+import { ok } from '@emdash/shared';
+import { LiveJobFailedError } from '@emdash/wire/live';
+import { cell } from '@emdash/wire/state';
+import { expose } from '@emdash/wire/state';
+import { createTestWire } from '@emdash/wire/testing';
+import { observable, runInAction } from 'mobx';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  createTask: vi.fn(),
+  startSession: vi.fn(),
   archiveMutation: vi.fn(),
   deleteBySubject: vi.fn(),
   deleteTasks: vi.fn(),
@@ -48,6 +50,10 @@ vi.mock('@core/manifests/browser/task-persistent-stores', async () => {
 
 vi.mock('@core/manifests/browser/task-scoped-stores', () => ({
   taskStoreContributions: [],
+}));
+
+vi.mock('@core/features/conversations/api/browser/client', () => ({
+  getConversationsClient: async () => ({ acp: { startSession: mocks.startSession } }),
 }));
 
 vi.mock('@core/features/conversations/browser/acp/acp-chat-store', () => ({
@@ -111,10 +117,10 @@ function makeTask(overrides: Partial<Task> = {}): Task {
   };
 }
 
-function makeTaskManager(): TaskManagerStore {
+function makeTaskManager(readHost = () => hostState): TaskManagerStore {
   const host = {
     get state() {
-      return hostState;
+      return readHost();
     },
     get liveAction() {
       return hostState.kind === 'ready'
@@ -134,7 +140,7 @@ function makeTaskManager(): TaskManagerStore {
           } as const);
     },
     requireLive: () =>
-      hostState.kind === 'ready'
+      readHost().kind === 'ready'
         ? ok()
         : {
             success: false as const,
@@ -190,7 +196,7 @@ function createTaskWire() {
   );
   const taskStatsProvider = expose(tasksWireContract.taskStats, { stats: taskStatsState });
   return createTestWire(tasksWireContract, {
-    createTask: vi.fn(),
+    createTask: mocks.createTask,
     getDeletePreflight: vi.fn(),
     deleteTask: vi.fn(),
     deleteTasks: (input: { projectId: string; taskIds: string[]; options?: unknown }) =>
@@ -421,6 +427,50 @@ describe('TaskManagerStore lifecycle', () => {
 
     expect(manager.taskStatsObservation).toEqual({ kind: 'unavailable' });
     manager.dispose();
+  });
+
+  it('starts the initial queue once after host recovery without selecting the task', async () => {
+    const state = observable.box<ProjectHostAccessState>(hostState);
+    const manager = makeTaskManager(() => state.get());
+    const task = makeTask();
+    mocks.createTask.mockImplementationOnce(async () => {
+      runInAction(() =>
+        state.set({ kind: 'degraded', situation: 'offline', recovery: 'automatic' })
+      );
+      return ok({ task });
+    });
+    mocks.startSession.mockResolvedValue(ok({ sessionId: 'saved' }));
+    try {
+      await manager.createTask({
+        projectId: task.projectId,
+        id: task.id,
+        taskConfig: {
+          version: '1',
+          name: task.name,
+          initialConversation: {
+            id: 'chat',
+            type: 'acp',
+            provider: 'claude',
+            initialQueue: [{ text: 'hello' }],
+          },
+        },
+        workspaceConfig: {
+          version: '2',
+          git: { kind: 'none' },
+          workspace: { kind: 'new-worktree' },
+        },
+      });
+      expect(mocks.startSession).not.toHaveBeenCalled();
+      taskListState.set({
+        tasks: [{ ...task, activeWorkspace: { path: '/tmp/w', workspaceId: 'workspace-1' } }],
+      });
+      runInAction(() => state.set({ kind: 'ready', hostGeneration: 2 }));
+      await vi.waitFor(() => expect(mocks.startSession).toHaveBeenCalledTimes(1));
+      await manager.provisionTask(task.id);
+      expect(mocks.startSession).toHaveBeenCalledTimes(1);
+    } finally {
+      manager.dispose();
+    }
   });
 
   it('does not provision a Task while live Project access is unavailable', async () => {

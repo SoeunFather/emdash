@@ -14,6 +14,23 @@ const input = makeStartInput({
 });
 
 describe('ACP initial queue persistence', () => {
+  it('joins foreground and background startup and consumes the initial prompt once', async () => {
+    const h = makeAcpHarness({ intents: createMemorySessionIntentStore() });
+    const runtime = new AcpRuntime(h.deps);
+    const first = { ...input, initialQueue: [{ text: 'first' }] };
+    try {
+      const starts = await Promise.all([
+        runtime.startSession(first, 'resume'),
+        runtime.startSession(first, 'resume'),
+      ]);
+      expect(starts.every((start) => start.success)).toBe(true);
+      await vi.waitFor(() => expect(h.agent.prompt).toHaveBeenCalledTimes(1));
+      expect(h.agent.newSession).toHaveBeenCalledTimes(1);
+    } finally {
+      await runtime.dispose();
+    }
+  });
+
   for (const operation of ['stop', 'terminate'] as const) {
     it.each([false, true])(
       `never dispatches from a stopped preparation (${operation}, commit=%s)`,
