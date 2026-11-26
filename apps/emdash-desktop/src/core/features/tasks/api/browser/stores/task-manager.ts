@@ -1,11 +1,4 @@
-import { nativePathIdentityKey } from '@emdash/core/primitives/path/api';
-import { err, isDeepEqual, ok, type Result as SharedResult } from '@emdash/shared';
-import { createScope, type Scope } from '@emdash/shared/concurrency';
-import { toast } from '@emdash/ui/react/primitives';
-import { createLiveJobReplicaCache, LiveJobFailedError } from '@emdash/wire/live';
-import { optimistic, remote, type OptimisticView, type RemoteModel } from '@emdash/wire/state';
-import { makeObservable, observable, runInAction, toJS } from 'mobx';
-import { match } from 'ts-pattern';
+import { getConversationsClient } from '@core/features/conversations/api/browser/client';
 import { PROJECT_LIVE_ACCESS_REQUIRED_MESSAGE } from '@core/features/projects/api/attachments';
 import type { ProjectHostAccess } from '@core/features/projects/api/browser/stores/project-context';
 import { getProjectManagerStore } from '@core/features/projects/api/browser/stores/project-selectors';
@@ -51,6 +44,14 @@ import type {
   TaskStatsData,
 } from '@core/primitives/tasks/api';
 import { observeReadableInAction } from '@core/primitives/wire/browser/mobx-readable';
+import { nativePathIdentityKey } from '@emdash/core/primitives/path/api';
+import { err, isDeepEqual, ok, type Result as SharedResult } from '@emdash/shared';
+import { createScope, type Scope } from '@emdash/shared/concurrency';
+import { toast } from '@emdash/ui/react/primitives';
+import { createLiveJobReplicaCache, LiveJobFailedError } from '@emdash/wire/live';
+import { optimistic, remote, type OptimisticView, type RemoteModel } from '@emdash/wire/state';
+import { makeObservable, observable, reaction, runInAction, toJS } from 'mobx';
+import { match } from 'ts-pattern';
 import { getTasksWireClient } from '../client';
 
 type TaskMutationInvocation<Data, Error> = {
@@ -151,6 +152,11 @@ export function wireErrorToWorkspaceError(error: unknown): WorkspaceError {
 export class TaskManagerStore {
   private readonly projectId: string;
   private readonly _settingsStore: ProjectSettingsStore;
+  private readonly pendingStarts = new Map<
+    string,
+    NonNullable<CreateTaskParams['taskConfig']['initialConversation']>
+  >();
+  private readonly stopHostRecovery: () => void;
   private _loadPromise: Promise<void> | null = null;
   private _teardownPromises = new Map<string, Promise<void>>();
   private _provisionPromises = new Map<string, Promise<TaskProvisionOutcome>>();
@@ -180,6 +186,18 @@ export class TaskManagerStore {
     this.projectId = projectId;
     this._settingsStore = settingsStore;
     makeObservable(this, { tasks: observable });
+    this.stopHostRecovery = reaction(
+      () => this.host.state.kind === 'ready',
+      (ready) => {
+        if (ready) {
+          for (const taskId of this.pendingStarts.keys()) {
+            void this.provisionTask(taskId).catch((error) =>
+              log.warn('Could not resume task startup', { taskId, error })
+            );
+          }
+        }
+      }
+    );
   }
 
   get taskStatsObservation(): ProjectHostObservation<TaskStatsData> {
@@ -333,6 +351,7 @@ export class TaskManagerStore {
       },
       shouldKeepMissing: (_taskId, task) => isUnregistered(task),
       remove: (task, taskId) => {
+        this.pendingStarts.delete(taskId);
         task.dispose();
         getNavigation().invalidateSubject(taskSubject({ taskId }));
       },
@@ -457,10 +476,48 @@ export class TaskManagerStore {
       toast.error(formatCreateTaskWarning(result.data.warning));
     }
 
+    const conversation = params.taskConfig.initialConversation;
+    if (conversation?.initialQueue?.length || conversation?.initialPrompt?.trim()) {
+      this.pendingStarts.set(params.id, conversation);
+    }
     await this.provisionTask(params.id);
   }
 
+  private async startPendingConversation(taskId: string) {
+    const conversation = this.pendingStarts.get(taskId);
+    if (!conversation || !this.host.requireLive().success) return;
+    this.pendingStarts.delete(taskId);
+    try {
+      const client = await getConversationsClient();
+      if (conversation.type === 'acp' && conversation.initialQueue?.length) {
+        // The host coalesces starts and consumes the initial queue once.
+        const result = await client.acp.startSession(
+          { conversationId: conversation.id, mode: 'resume' },
+          { timeoutMs: 0 }
+        );
+        if (!result.success) throw new Error(result.error.type);
+      } else if (conversation.type === 'pty' && conversation.initialPrompt?.trim()) {
+        const result = await client.hydrateConversation({
+          conversationId: conversation.id,
+          taskId,
+          projectId: this.projectId,
+        });
+        if (!result.success) throw new Error(result.error.type);
+      }
+    } catch (error) {
+      if (this.tasks.has(taskId)) this.pendingStarts.set(taskId, conversation);
+      log.warn('Initial conversation could not start', { conversationId: conversation.id, error });
+      toast.error('Could not start the agent. Open the conversation to retry.');
+    }
+  }
+
   async provisionTask(taskId: string): Promise<TaskProvisionOutcome> {
+    const outcome = await this.ensureProvisioned(taskId);
+    if (outcome.kind === 'active') await this.startPendingConversation(taskId);
+    return outcome;
+  }
+
+  private async ensureProvisioned(taskId: string): Promise<TaskProvisionOutcome> {
     const inFlight = this._provisionPromises.get(taskId);
     if (inFlight) return inFlight;
 
@@ -850,6 +907,8 @@ export class TaskManagerStore {
   }
 
   dispose(): void {
+    this.stopHostRecovery();
+    this.pendingStarts.clear();
     for (const task of this.tasks.values()) {
       task.dispose();
     }
