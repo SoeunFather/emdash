@@ -110,8 +110,7 @@ export class AcpLiveSession {
 
   private constructor(
     readonly conversationId: string,
-    private readonly client: ConversationsClient['acp'],
-    private startMode: AcpSessionStartMode
+    private readonly client: ConversationsClient['acp']
   ) {
     const key = { conversationId };
     // Subscribe to individual states: remote(model) waits for *every* state acquisition
@@ -174,11 +173,7 @@ export class AcpLiveSession {
     if (!result.success) {
       throw new AcpStartError(result.error);
     }
-    const session = new AcpLiveSession(
-      conversationId,
-      client,
-      result.data.sessionId ? 'resume' : 'fresh'
-    );
+    const session = new AcpLiveSession(conversationId, client);
     try {
       await withTimeout(session.sessionState.ready, 'Timed out connecting ACP live models');
       runInAction(() => session.usableState.set(true));
@@ -201,7 +196,6 @@ export class AcpLiveSession {
       );
       if (validation !== this.validation || this.disposed) return;
       if (!result.success) throw new AcpStartError(result.error);
-      this.startMode = result.data.sessionId ? 'resume' : 'fresh';
       await withTimeout(this.refreshStates(), 'Timed out refreshing ACP session', 10_000, signal);
       if (!this.disposed && !signal.aborted && validation === this.validation)
         runInAction(() => this.usableState.set(true));
@@ -210,12 +204,11 @@ export class AcpLiveSession {
     }
   }
 
-  async startSession(mode: AcpSessionStartMode = this.startMode) {
+  async startSession(mode: AcpSessionStartMode = 'resume') {
     const result = await this.client.startSession(
       { conversationId: this.conversationId, mode },
       { timeoutMs: 0 }
     );
-    if (result.success) this.startMode = 'resume';
     return result;
   }
 

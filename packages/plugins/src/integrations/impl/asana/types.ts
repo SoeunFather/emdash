@@ -4,6 +4,7 @@ import type { VerifiedAccountIdentity } from '../../capabilities/auth';
 import { credentialString } from '../../helpers/credentials';
 
 export const asanaCredentialsSchema = z.object({
+  worktreeField: z.string().trim().optional(),
   accessToken: credentialString('Access token is required'),
 });
 
@@ -28,6 +29,7 @@ export type AsanaTask = {
   gid: string;
   name?: string;
   notes?: string;
+  customFields?: AsanaCustomField[];
   permalinkUrl?: string;
   completed?: boolean;
   modifiedAt?: string;
@@ -39,7 +41,14 @@ export type AsanaTask = {
   }>;
 };
 
+type AsanaCustomField = {
+  gid?: string;
+  name?: string;
+  display_value?: string | null;
+};
+
 export type RawAsanaTask = {
+  custom_fields?: AsanaCustomField[];
   gid?: string;
   name?: string;
   notes?: string;

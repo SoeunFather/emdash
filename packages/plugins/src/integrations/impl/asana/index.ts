@@ -24,6 +24,13 @@ const plugin = defineIntegrationPlugin(
               required: true,
               placeholder: 'Asana personal access token',
             },
+            {
+              id: 'worktreeField',
+              label: 'Worktree name field (optional)',
+              secret: false,
+              placeholder: 'Asana custom field name or GID',
+              required: false,
+            },
           ],
           help: 'Open Asana and got to My Settings > Apps, click on Developer Apps and create a new Personal Access Token.',
           helpUrl: 'https://developers.asana.com/docs/personal-access-token',
